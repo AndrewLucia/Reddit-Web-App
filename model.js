@@ -1,5 +1,15 @@
 
 const got = require('got');
+const err = require('./errors');
+
+class Response {
+    error;
+    response;
+    constructor(error, response) {
+        this.error = error;
+        this.response = response;
+    }
+}
 
 class Article {
     title;
@@ -23,27 +33,32 @@ class ArticleList {
     addArticle(article) {
         this.articles.push(article);
     }
-}
+};
 
 async function getSubredditTopArticles(subreddit) {
-    try{
-        var resultsObject = await callRedditAPI(subreddit);
+    var resultsObject = await callRedditAPI(subreddit);
+    if (resultsObject.error != null) {
+        return resultsObject.error.message;
+    }
+
+    try {
+        var resultsList = resultsObject.data.children;
+        var articleList = new ArticleList();
+        for (var post of resultsList) {
+            var data = post.data;
+            var text = data.selftext;
+            var title = data.title;
+            var article = data.url;
+            var sanitizedArticle = new Article(title, text, article);
+
+            articleList.addArticle(sanitizedArticle);
+        }
+
+        return JSON.stringify(articleList);
     } catch(error) {
-        return error;
+        console.log(error);
+        return new err.BaseError().message;
     }
-    var resultsList = resultsObject.data.children;
-    var articleList = new ArticleList();
-    for (var post of resultsList) {
-        var data = post.data;
-        var text = data.selftext;
-        var title = data.title;
-        var article = data.url;
-        var sanitizedArticle = new Article(title, text, article);
-
-        articleList.addArticle(sanitizedArticle);
-    }
-
-    return JSON.stringify(articleList);
 };
 
 async function callRedditAPI(subreddit) {
@@ -52,8 +67,14 @@ async function callRedditAPI(subreddit) {
         return JSON.parse(response.body);
     }
     catch (error) {
+        if (error instanceof got.HTTPError) {
+            return new Response(error, null);
+        } else if (error instanceof SyntaxError) {
+            console.log(error.message);
+            return new Response(new err.BaseError(), null);
+        }
         console.log(error.message);
-        throw error.message;
+        return new Response(new err.APIError(), null);
     }
 };
 
