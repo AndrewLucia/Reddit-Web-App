@@ -67,9 +67,7 @@ async function callRedditAPI(subreddit) {
         return JSON.parse(response.body);
     }
     catch (error) {
-        if (error instanceof got.HTTPError) {
-            return new Response(error, null);
-        } else if (error instanceof SyntaxError) {
+        if (error instanceof SyntaxError) {
             console.log(error.message);
             return new Response(new err.BaseError(), null);
         }
